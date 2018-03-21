@@ -9,7 +9,7 @@
   <el-form :model="ruleform1" status-icon :rules="rules" ref="ruleform1">
 
     <el-form-item label="用户名称" :label-width="formLabelWidth" prop="name">
-      <el-input v-model="ruleform1.name" auto-complete="off"></el-input>
+      <el-input v-model="ruleform1.name" auto-complete="off" @blur="submitForm('ruleform1')"></el-input>
     </el-form-item>
 
     <el-form-item label="用户邮箱" :label-width="formLabelWidth"  prop="email">
@@ -20,8 +20,8 @@
       <el-input type="password" v-model="ruleform1.password" auto-complete="off"></el-input>
     </el-form-item>
 
-    <el-form-item label="确认密码" :label-width="formLabelWidth" prop="passwordCompare">
-      <el-input type="password" v-model="ruleform1.passwordCompare" auto-complete="off"></el-input>
+    <el-form-item label="确认密码" :label-width="formLabelWidth" prop="password_confirmation" >
+      <el-input type="password" v-model="ruleform1.password_confirmation" auto-complete="off"></el-input>
     </el-form-item>
 
   </el-form>
@@ -106,7 +106,7 @@ export default {
     var validatePass2 = (rule, value, callback) => {
       if (value === "") {
         callback(new Error("请再次输入密码"));
-      } else if (value !== this.ruleform1.passwordCompare) {
+      } else if (value !== this.ruleform1.password_confirmation) {
         callback(new Error("两次输入密码不一致!"));
       } else {
         callback();
@@ -131,7 +131,7 @@ export default {
         name: "",
         email: "",
         password: "",
-        passwordCompare: ""
+        password_confirmation: ""
       },
       rules: {
         // name: [
@@ -149,11 +149,12 @@ export default {
         // password: [
         //   { required: true, message: "请输入用户密码", trigger: "blur" }
         // ],
-        // passwordCompare: [{ validator: validatePass2, trigger: "blur" }]
+        // password_confirmation: [{ validator: validatePass2, trigger: "blur" }]
       },
       formLabelWidth: "120px",
 
-      multipleSelection: []
+      multipleSelection: [],
+      errors:{name:''}
     };
   },
   mounted: function() {},
@@ -174,6 +175,8 @@ export default {
     },
     handleEdit(index, row) {
       console.log(index, row);
+      this.dialogFormVisible=true; 
+      _.extend(this.ruleform1,row); 
     },
     handleDelete(index, row) {
       console.log(index, row);
@@ -235,29 +238,27 @@ export default {
       params.name=this.ruleform1.name;
       params.email=this.ruleform1.email;
       params.password=this.ruleform1.password;
-      params.passwordCompare=this.ruleform1.passwordCompare;
+      params.password_confirmation=this.ruleform1.password_confirmation;
 
       this.$refs[formName].validate((valid) => {
+
         if (valid) {
           this.$http
               .post('/api/admin/user',params,{emulateJSON: true})
               .then((res)=>{
-              //_.forEach(res.body, (value,key) => {
-                this.rules['name']=this.rules['name']||[];
-                this.rules['name'].push({ validator: (rule, value, callback) => {
-                  value='error';
-                  if (value) {
-                    callback(new Error(value));
-                  } else {
-                    callback();
-                  }
-                }, trigger: "blur" });
-this.$refs[formName].validateField('name',()=>{});
-              //});
-                //this.$refs[formName].validateField('name',()=>{});
+
               })
               .catch((res)=>{
-                console.log(res)
+                this.$refs[formName].fields.forEach(field => {
+                  let err='success',msg=''
+                  if(res.body[field.prop]){
+                    err='error'
+                    msg=res.body[field.prop][0]
+                  }
+                  //this.errors[field.prop]=msg
+                  field.validateState=err
+                  field.validateMessage=msg
+                })
               })
         } else {
           console.log("error submit!!");
