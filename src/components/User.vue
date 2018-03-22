@@ -2,28 +2,28 @@
 
 <div>
 
-  <el-button type="primary" @click="dialogFormVisible  = true">添加</el-button>
+  <el-button type="primary" @click="openUser('ruleform1')">添加</el-button>
 
  <el-dialog title="添加用户" :visible.sync="dialogFormVisible" center>
 
   <el-form :model="ruleform1" status-icon :rules="rules" ref="ruleform1">
 
     <el-form-item label="用户名称" :label-width="formLabelWidth" prop="name">
-      <el-input v-model="ruleform1.name" auto-complete="off" @blur="submitForm('ruleform1')"></el-input>
+      <el-input v-model="ruleform1.name" auto-complete="off"></el-input>
     </el-form-item>
 
     <el-form-item label="用户邮箱" :label-width="formLabelWidth"  prop="email">
       <el-input v-model="ruleform1.email" auto-complete="off"></el-input>
     </el-form-item>
+    <template v-if="!edit">
+        <el-form-item label="用户密码" :label-width="formLabelWidth" prop="password">
+          <el-input type="password" v-model="ruleform1.password" auto-complete="off"></el-input>
+        </el-form-item>
 
-    <el-form-item label="用户密码" :label-width="formLabelWidth" prop="password">
-      <el-input type="password" v-model="ruleform1.password" auto-complete="off"></el-input>
-    </el-form-item>
-
-    <el-form-item label="确认密码" :label-width="formLabelWidth" prop="password_confirmation" >
-      <el-input type="password" v-model="ruleform1.password_confirmation" auto-complete="off"></el-input>
-    </el-form-item>
-
+        <el-form-item label="确认密码" :label-width="formLabelWidth" prop="password_confirmation" >
+          <el-input type="password" v-model="ruleform1.password_confirmation" auto-complete="off"></el-input>
+        </el-form-item>
+    </template>
   </el-form>
 
   <div slot="footer" class="dialog-footer">
@@ -114,7 +114,6 @@ export default {
     };
 
     return {
-
       tableData: [],
       //请求的URL
       url: "/api/admin/user",
@@ -134,27 +133,28 @@ export default {
         password_confirmation: ""
       },
       rules: {
-        // name: [
-        //   { required: true, message: "请输入用户名称", trigger: "blur" },
-        //   { min: 6, max: 30, message: "长度在 6 到 30 个字符", trigger: "blur" }
-        // ],
-        // email: [
-        //   {
-        //     type: "email",
-        //     required: true,
-        //     message: "请输入用户邮箱",
-        //     trigger: "blur"
-        //   }
-        // ],
-        // password: [
-        //   { required: true, message: "请输入用户密码", trigger: "blur" }
-        // ],
-        // password_confirmation: [{ validator: validatePass2, trigger: "blur" }]
+        name: [
+          { required: true, message: "请输入用户名称", trigger: "blur" },
+          { min: 6, max: 30, message: "长度在 6 到 30 个字符", trigger: "blur" }
+        ],
+        email: [
+          {
+            type: "email",
+            required: true,
+            message: "请输入用户邮箱",
+            trigger: "blur"
+          }
+        ],
+        password: [
+          { required: true, message: "请输入用户密码", trigger: "blur" }
+        ],
+        password_confirmation: [{ validator: validatePass2, trigger: "blur" }]
       },
       formLabelWidth: "120px",
 
       multipleSelection: [],
-      errors:{name:''}
+      errors: false,
+      edit: false
     };
   },
   mounted: function() {},
@@ -175,8 +175,9 @@ export default {
     },
     handleEdit(index, row) {
       console.log(index, row);
-      this.dialogFormVisible=true; 
-      _.extend(this.ruleform1,row); 
+      this.edit = true;
+      this.dialogFormVisible = true;
+      _.extend(this.ruleform1, row);
     },
     handleDelete(index, row) {
       console.log(index, row);
@@ -232,34 +233,38 @@ export default {
         .catch(_ => {});
     },
     submitForm: function(formName) {
-
-      const params={};
-
-      params.name=this.ruleform1.name;
-      params.email=this.ruleform1.email;
-      params.password=this.ruleform1.password;
-      params.password_confirmation=this.ruleform1.password_confirmation;
-
-      this.$refs[formName].validate((valid) => {
-
+      let method, url;
+      if (this.edit) {
+        method = "put";
+        url = "/api/admin/user/" + this.ruleform1.id;
+      } else {
+        method = "post";
+        url = "/api/admin/user";
+      }
+      this.$refs[formName].validate(valid => {
         if (valid) {
-          this.$http
-              .post('/api/admin/user',params,{emulateJSON: true})
-              .then((res)=>{
-
-              })
-              .catch((res)=>{
-                this.$refs[formName].fields.forEach(field => {
-                  let err='success',msg=''
-                  if(res.body[field.prop]){
-                    err='error'
-                    msg=res.body[field.prop][0]
-                  }
-                  //this.errors[field.prop]=msg
-                  field.validateState=err
-                  field.validateMessage=msg
-                })
-              })
+          this.$http[method](url, this.ruleform1, { emulateJSON: true })
+            .then(res => {
+              this.$message({
+                type: "success",
+                message: "保存成功!"
+              });
+              this.getData();
+              this.dialogFormVisible = false;
+            })
+            .catch(res => {
+              this.$refs[formName].fields.forEach(field => {
+                let err = "success",
+                  msg = "";
+                if (res.body[field.prop]) {
+                  err = "error";
+                  msg = res.body[field.prop][0];
+                  this.errors = true;
+                }
+                field.validateState = err;
+                field.validateMessage = msg;
+              });
+            });
         } else {
           console.log("error submit!!");
           return false;
@@ -268,6 +273,16 @@ export default {
     },
     resetForm: function(formName) {
       this.$refs[formName].resetFields();
+    },
+    openUser: function(formName) {
+      this.edit = false;
+      this.ruleform1 = {
+        name: "",
+        email: "",
+        password: "",
+        password_confirmation: ""
+      };
+      this.dialogFormVisible = true;
     }
   }
 };
